@@ -207,8 +207,15 @@ static void set_temp(int temp, const time_t *now, int smooth, int step, int time
         }
         /* Temperature difference */
         step = abs(conf.gamma_conf.temp[DAY] - conf.gamma_conf.temp[NIGHT]);
-        /* Compute each step size with a gamma_trans_timeout of 10s */
-        step /= (((double)timeout) / GAMMA_LONG_TRANS_TIMEOUT);
+        /* Compute each step size with a gamma_trans_timeout of 10s.
+         * Use ceiling division so the transition ends during the event window
+         * instead of overshooting it and snapping at the end.
+         * Guard against num_steps == 0 (with remaining window < 10s): keep step as the
+         * full diff so clightd snaps to target instead of invoking UB from dividing by zero. */
+        const int num_steps = timeout / GAMMA_LONG_TRANS_TIMEOUT;
+        if (num_steps > 0) {
+            step = (step + num_steps - 1) / num_steps;
+        }
         /* force gamma_trans_timeout to 10s (in ms) */
         timeout = GAMMA_LONG_TRANS_TIMEOUT * 1000;
         
